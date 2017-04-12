@@ -10,19 +10,23 @@ const Train = ({ id, line, status, canEdit, updateTrains }) => {
 
     fetch(`/api/v1/trains/${trainId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         train: { status: value }
       }),
       headers: {
         'Content-Type': 'application/json'
       }
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw Error(response.statusText);
+    }
+      return response.json();
+    })
     .then(updatedTrains => {
       updateTrains(updatedTrains);
     })
     .catch(error => console.log('Error: ', error));
-  }
 
   return (
     <div className={`${styles[line]} ${styles.train}`}>

@@ -6,7 +6,27 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const bodyParser = require('body-parser');
+const jwt = require('jsonwebtoken');
+const config = require('dotenv').config();
 
+const checkAuth = (request, response, next) => {
+
+  // Check headers/POST body/URL params for an authorization token
+  const token = request.body.token ||
+                request.param('token') ||
+                request.headers['authorization'];
+
+  if (token) {
+    // do a lot of fancy things
+  }
+
+  else {
+    return response.status(403).send({
+      success: false,
+      message: 'You must be authorized to hit this endpoint'
+    });
+  }
+});
 
 
 
@@ -26,13 +46,74 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors());
 
+if (!config.CLIENT_SECRET || !config.USERNAME || !config.PASSWORD) {
+  throw 'Make sure you have a CLIENT_SECRET, USERNAME, and PASSWORD in your .env file'
+}
+app.set('secretKey', config.CLIENT_SECRET);
+
+app.get('/api/v1/trains', (request, response) => {
+  response.send(app.locals.trains);
+});
 
 
-// =================================================================
-// API Endpoints ===================================================
-// =================================================================
+// Authentication/Login Endpoint
+  app.post('/authenticate', (request, response) => {
+    const user = request.body;
 
-// This is all you baby!
+    // If the user enters credentials that don't match our hard-coded
+    // credentials in our .env configuration file, send a JSON error
+    if (user.username !== config.USERNAME || user.password !== config.PASSWORD) {
+      response.status(403).send({
+        success: false,
+        message: 'Invalid Credentials'
+      });
+    }
+
+    // If the credentials are accurate, create a token and send it back
+    else {
+      let token = jwt.sign(user, app.get('secretKey'), {
+        expiresIn: 172800 // expires in 48 hours
+      });
+
+      response.json({
+        success: true,
+        username: user.username,
+        token: token
+      });
+    }
+  });
+
+app.patch('/api/v1/trains/:id', checkAuth, (request, response) => {
+  const { train } = request.body;
+  const { id } = request.params;
+  const index = app.locals.trains.findIndex((m) => m.id == id);
+
+  if (index === -1) { return response.sendStatus(404); }
+
+  const originalTrain = app.locals.trains[index];
+  app.locals.trains[index] = Object.assign(originalTrain, train);
+
+  return response.json(app.locals.trains);
+});
+
+jwt.verify(token, app.get('secretKey'), (error, decoded) => {
+
+    // If the token is invalid or expired, respond with an error
+    if (error) {
+      return response.status(403).send({
+        success: false,
+        message: 'Invalid authorization token.'
+      });
+    }
+
+    // If the token is valid, save the decoded version to the
+    // request for use in other routes & continue on with next()
+    else {
+      request.decoded = decoded;
+      next();
+    }
+  });
+
 
 
 
